@@ -1,5 +1,7 @@
 import random
 import sqlite3
+import tkinter as tk
+from tkinter import messagebox
 
 # Database setup
 def setup_database():
@@ -125,29 +127,81 @@ def move_player(direction):
     conn.close()
     return True
 
-# Main game logic
-def play_game():
-    setup_database()
-    initialize_grid()
-    initialize_player()
-
-    while True:
-        print_grid()
+class GridGameGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Grid Game")
+        
+        # Create game frame
+        self.game_frame = tk.Frame(root)
+        self.game_frame.pack(padx=10, pady=10)
+        
+        # Create grid of buttons
+        self.buttons = []
+        for i in range(10):
+            row = []
+            for j in range(10):
+                btn = tk.Button(self.game_frame, width=2, height=1)
+                btn.grid(row=i, column=j, padx=1, pady=1)
+                row.append(btn)
+            self.buttons.append(row)
+        
+        # Score label
+        self.score_label = tk.Label(root, text="Score: 0")
+        self.score_label.pack(pady=5)
+        
+        # Control buttons
+        control_frame = tk.Frame(root)
+        control_frame.pack(pady=5)
+        
+        tk.Button(control_frame, text="↑", command=lambda: self.move('w')).grid(row=0, column=1)
+        tk.Button(control_frame, text="←", command=lambda: self.move('a')).grid(row=1, column=0)
+        tk.Button(control_frame, text="↓", command=lambda: self.move('s')).grid(row=1, column=1)
+        tk.Button(control_frame, text="→", command=lambda: self.move('d')).grid(row=1, column=2)
+        
+        # Initialize game
+        setup_database()
+        initialize_grid()
+        initialize_player()
+        self.update_display()
+    
+    def update_display(self):
         conn = sqlite3.connect('db_game.db')
         cursor = conn.cursor()
-        score = cursor.execute('SELECT score FROM player').fetchone()[0]
+        
+        # Clear all buttons
+        for row in self.buttons:
+            for btn in row:
+                btn.configure(text=".", bg="white")
+        
+        # Update grid elements
+        grid_data = cursor.execute('SELECT x, y, element FROM grid').fetchall()
+        for x, y, element in grid_data:
+            color = "yellow" if element == 'R' else "red" if element == 'X' else "green"
+            self.buttons[x][y].configure(text=element, bg=color)
+        
+        # Update player position
+        player_data = cursor.execute('SELECT x, y, score FROM player').fetchone()
+        px, py, score = player_data
+        self.buttons[px][py].configure(text="*", bg="blue")
+        
+        # Update score
+        self.score_label.configure(text=f"Score: {score}")
+        
         conn.close()
+    
+    def move(self, direction):
+        if move_player(direction):
+            self.update_display()
+        else:
+            messagebox.showinfo("Game Over", "You hit corrupted data! Game over.")
+            self.root.quit()
 
-        print(f"Score: {score}")
-        print("Move using W (up), A (left), S (down), D (right). Type 'q' to quit.")
-        move = input("Your move: ").lower()
-
-        if move == 'q':
-            print("Thanks for playing!")
-            break
-
-        if not move_player(move):
-            break
+# Update the play_game function to use GUI
+def play_game():
+    root = tk.Tk()
+    game = GridGameGUI(root)
+    root.mainloop()
 
 # Run the game
 if __name__ == "__main__":
